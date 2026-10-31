@@ -18,6 +18,8 @@ type Phase = 'asking' | 'success' | 'tryagain' | 'done';
 /** Pause between the end of the praise and the next target. */
 const ADVANCE_PAUSE_MS = 700;
 const TRY_AGAIN_RESET_MS = 2200;
+/** Head start the crowd cheer gets before the spoken praise. */
+const CHEER_LEAD_MS = 650;
 
 interface Props {
   content: ContentId;
@@ -96,15 +98,28 @@ export function FindTheKey({ content, sequence, inputEnabled, onHome, onPlayAgai
       setPhase('success');
       const k = Math.floor(Math.random() * PRAISE.length);
       setPraiseLabel(PRAISE[k]);
-      sfx.success();
-      narrator.speak(phrases.praise(target, k), { onEnd: () => later(advance, ADVANCE_PAUSE_MS) });
+      // The crowd cheers first; the praise starts as the cheer settles down.
+      const cheer = sfx.cheer();
+      narrator.cancel();
+      later(
+        () => narrator.speak(phrases.praise(target, k), { onEnd: () => later(advance, ADVANCE_PAUSE_MS) }),
+        cheer > 0 ? CHEER_LEAD_MS : 0,
+      );
       return;
     }
 
     setPhase('tryagain');
-    sfx.gentle();
+    const raspberry = sfx.raspberry();
     // Don't restart the same encouragement on every mash; let it finish once.
-    if (!narrator.isSpeaking('tryagain')) narrator.speak(phrases.tryAgain(set, target), { tag: 'tryagain' });
+    if (!narrator.isSpeaking('tryagain')) {
+      if (raspberry > 0) {
+        // Let the raspberry be heard on its own, then encourage.
+        narrator.cancel();
+        later(() => narrator.speak(phrases.tryAgain(set, target), { tag: 'tryagain' }), raspberry * 1000 + 120);
+      } else {
+        narrator.speak(phrases.tryAgain(set, target), { tag: 'tryagain' });
+      }
+    }
     later(() => {
       if (phaseRef.current === 'tryagain') setPhase('asking');
     }, TRY_AGAIN_RESET_MS);
