@@ -132,6 +132,58 @@ function artwork(id: AvatarId): ReactNode {
           <polygon points="43,59 57,59 50,68" fill="#F39A2B" stroke="#F39A2B" strokeWidth={3} strokeLinejoin="round" />
         </>
       );
+    case 'owl':
+      return (
+        <>
+          <polygon points="22,30 30,10 40,26" fill="#A47551" stroke="#A47551" strokeWidth={4} strokeLinejoin="round" />
+          <polygon points="78,30 70,10 60,26" fill="#A47551" stroke="#A47551" strokeWidth={4} strokeLinejoin="round" />
+          <ellipse cx={50} cy={56} rx={34} ry={35} fill="#A47551" />
+          <ellipse cx={50} cy={72} rx={18} ry={14} fill="#E9D3B8" />
+          <path d="M42 70 q3 3 6 0 M52 70 q3 3 6 0 M47 77 q3 3 6 0" stroke="#C8A988" strokeWidth={1.8} fill="none" strokeLinecap="round" />
+          {[36, 64].map((x) => (
+            <g key={x}>
+              <circle cx={x} cy={46} r={13} fill="#FFF8EC" />
+              <circle cx={x} cy={47} r={6} fill={INK} />
+              <circle cx={x + 2} cy={45} r={2} fill="#fff" />
+            </g>
+          ))}
+          <polygon points="45,56 55,56 50,64" fill="#F39A2B" stroke="#F39A2B" strokeWidth={2.5} strokeLinejoin="round" />
+        </>
+      );
+    case 'parrot':
+      return (
+        <>
+          <path d="M44 22 Q40 6 50 8 Q46 16 52 22 Q56 8 64 12 Q56 18 58 26 Z" fill="#E5484D" />
+          <circle cx={50} cy={56} r={33} fill="#4CB872" />
+          <ellipse cx={64} cy={58} rx={14} ry={16} fill="#FFF8EC" />
+          <circle cx={62} cy={52} r={4.2} fill={INK} />
+          <circle cx={63.4} cy={50.6} r={1.4} fill="#fff" />
+          <path d="M70 56 Q86 58 80 74 Q76 66 68 66 Z" fill="#F5A524" stroke="#E08E10" strokeWidth={1.5} strokeLinejoin="round" />
+          <circle cx={38} cy={66} r={5.5} fill="#FF8FA3" opacity={0.45} />
+          <path d="M22 50 Q30 44 38 50" stroke="#2E9E57" strokeWidth={3} fill="none" strokeLinecap="round" />
+        </>
+      );
+    case 'penguin':
+      return (
+        <>
+          <ellipse cx={50} cy={56} rx={34} ry={35} fill="#2F3A56" />
+          <path d="M50 38 C36 30 22 42 26 60 C30 80 70 80 74 60 C78 42 64 30 50 38 Z" fill="#FFFFFF" />
+          <Eyes y={52} spread={10} />
+          <Cheeks y={62} />
+          <ellipse cx={50} cy={62} rx={7} ry={4} fill="#F5A524" />
+        </>
+      );
+    case 'duck':
+      return (
+        <>
+          <path d="M48 22 Q50 12 56 16" stroke="#FFFFFF" strokeWidth={5} fill="none" strokeLinecap="round" />
+          <circle cx={50} cy={56} r={33} fill="#FFFFFF" stroke="#E3EEF2" strokeWidth={1.5} />
+          <Eyes y={48} spread={11} />
+          <Cheeks y={58} />
+          <ellipse cx={50} cy={64} rx={13} ry={6.5} fill="#F5A524" />
+          <path d="M39 64 H61" stroke="#E08E10" strokeWidth={1.6} strokeLinecap="round" />
+        </>
+      );
     case 'lion':
       return (
         <>

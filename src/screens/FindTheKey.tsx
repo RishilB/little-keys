@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { Avatar } from '../components/Avatar';
 import { Confetti, StarMascot } from '../components/Celebration';
+import { FloatingFriends } from '../components/FloatingFriends';
 import { Icon } from '../components/Icon';
 import { OnScreenKeyboard } from '../components/OnScreenKeyboard';
 import { ParentBar } from '../components/ParentBar';
 import { CONTENT_SETS, KEYBOARD_ROWS, colorForChar, type ContentId } from '../data/characters';
-import { labels, phrases } from '../data/phrases';
+import { PRAISE, labels, phrases, type Line } from '../data/phrases';
 import { useCharInput } from '../hooks/useCharInput';
 import { narrator } from '../lib/narrator';
 import { firstIndex, nextIndex, type SequenceMode } from '../lib/sequence';
@@ -35,7 +36,7 @@ export function FindTheKey({ content, sequence, inputEnabled, onHome, onPlayAgai
   const [index, setIndex] = useState(() => firstIndex(sequence, set.items.length));
   const [phase, setPhaseState] = useState<Phase>('asking');
   const [pulse, setPulse] = useState(0); // bumps to replay feedback animations
-  const [praiseLabel, setPraiseLabel] = useState(labels.praise[0]);
+  const [praiseLabel, setPraiseLabel] = useState(PRAISE[0]);
 
   // Refs hold the authoritative state so rapid key presses never act on stale values.
   const indexRef = useRef(index);
@@ -52,12 +53,14 @@ export function FindTheKey({ content, sequence, inputEnabled, onHome, onPlayAgai
     timers.current = [];
   };
 
-  const present = (i: number, intro?: string) => {
+  const present = (i: number, intro?: Line[]) => {
     indexRef.current = i;
     setIndex(i);
     setPhase('asking');
-    const prompt = phrases.prompt(set, set.items[i]);
-    narrator.speak(intro ? `${intro} ${prompt}` : prompt, { tag: 'prompt' });
+    const target = set.items[i];
+    narrator.speak([...(intro ?? []), ...phrases.prompt(set, target)], { tag: 'prompt' });
+    // Fetch the likely next clips ahead of time so feedback starts instantly.
+    narrator.preload([...phrases.praise(target, 0), ...phrases.tryAgain(set, target)]);
   };
 
   const advance = () => {
@@ -91,16 +94,17 @@ export function FindTheKey({ content, sequence, inputEnabled, onHome, onPlayAgai
 
     if (char === target.char) {
       setPhase('success');
-      setPraiseLabel(labels.praise[Math.floor(Math.random() * labels.praise.length)]);
+      const k = Math.floor(Math.random() * PRAISE.length);
+      setPraiseLabel(PRAISE[k]);
       sfx.success();
-      narrator.speak(phrases.praise(target), { onEnd: () => later(advance, ADVANCE_PAUSE_MS) });
+      narrator.speak(phrases.praise(target, k), { onEnd: () => later(advance, ADVANCE_PAUSE_MS) });
       return;
     }
 
     setPhase('tryagain');
     sfx.gentle();
     // Don't restart the same encouragement on every mash; let it finish once.
-    if (!narrator.isSpeaking('tryagain')) narrator.speak(phrases.tryAgain(target), { tag: 'tryagain' });
+    if (!narrator.isSpeaking('tryagain')) narrator.speak(phrases.tryAgain(set, target), { tag: 'tryagain' });
     later(() => {
       if (phaseRef.current === 'tryagain') setPhase('asking');
     }, TRY_AGAIN_RESET_MS);
@@ -132,6 +136,7 @@ export function FindTheKey({ content, sequence, inputEnabled, onHome, onPlayAgai
 
       {phase === 'done' ? (
         <main className="stage done-stage">
+          <FloatingFriends cheer={pulse + 1} />
           {!reducedMotion && <Confetti count={24} />}
           <div className="done-art">
             {profile && <Avatar id={profile.avatar} size={150} className="bounce" />}
@@ -151,6 +156,7 @@ export function FindTheKey({ content, sequence, inputEnabled, onHome, onPlayAgai
         </main>
       ) : (
         <main className="stage find-stage">
+          <FloatingFriends variant="edges" cheer={phase === 'success' ? pulse : 0} />
           <div className="target-wrap">
             <div key={`target-${index}`} className={`target-card is-${phase}`} style={{ color }}>
               <span

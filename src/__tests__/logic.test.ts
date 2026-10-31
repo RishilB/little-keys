@@ -80,3 +80,36 @@ describe('playground placement', () => {
     }
   });
 });
+
+describe('narration lines', () => {
+  it('has unique clip ids and covers every line the app can say', async () => {
+    const { allLines, phrases, PRAISE } = await import('../data/phrases');
+    const { CONTENT_SETS } = await import('../data/characters');
+    const ids = allLines().map((l) => l.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const known = new Set(ids);
+    const said = [
+      ...phrases.greeting('Mia'),
+      ...phrases.findIntro(),
+      ...phrases.finished('Mia'),
+      ...phrases.playgroundIntro(),
+      ...phrases.voiceTest('Mia'),
+    ];
+    for (const set of Object.values(CONTENT_SETS)) {
+      for (const item of set.items) {
+        for (let i = 0; i < 10; i++) said.push(...phrases.prompt(set, item), ...phrases.tryAgain(set, item));
+        PRAISE.forEach((_, k) => said.push(...phrases.praise(item, k)));
+        said.push(...phrases.repeatPrompt(set, item), ...phrases.playgroundKey(item));
+      }
+    }
+    for (const line of said) expect(known.has(line.id), line.id).toBe(true);
+  });
+
+  it('never puts the child name in a recording', async () => {
+    const { phrases } = await import('../data/phrases');
+    for (const line of [...phrases.greeting('Mia'), ...phrases.finished('Mia'), ...phrases.voiceTest('Mia')]) {
+      expect(line.text).toContain('Mia');
+      expect(line.clip).not.toContain('Mia');
+    }
+  });
+});

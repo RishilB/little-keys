@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "voice": "vite-node scripts/generate-voice.ts --"
   },
   "dependencies": {
     "@fontsource/andika": "^5.1.0",

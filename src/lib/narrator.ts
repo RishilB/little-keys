@@ -1,8 +1,13 @@
+import type { Line } from '../data/phrases';
+
 /**
  * One voice at a time. Every call to `speak` cancels whatever is playing, so
  * narration can never overlap or build up into a queue; the latest request wins.
  * When narration is off (or unsupported) `onEnd` still fires after a short,
  * speech-like pause so activities keep the same pacing without sound.
+ *
+ * Two voices are supported: pre-recorded clips (a natural voice, identical on
+ * every device) and the browser's built-in speech as a fallback.
  */
 
 export interface SpeakOptions {
@@ -35,8 +40,16 @@ export function rankEnglishVoices(voices: SpeechSynthesisVoice[]): SpeechSynthes
     .sort((a, b) => scoreVoice(b) - scoreVoice(a) || a.name.localeCompare(b.name));
 }
 
+/** The recorded voice shipped in public/voice/<RECORDED_VOICE>/. */
+export const RECORDED_VOICE = { id: 'neerja', label: 'Neerja (natural voice)' };
+const RECORDED_BASE = `${import.meta.env.BASE_URL}voice/${RECORDED_VOICE.id}`;
+/** Speech rate the recordings were made at; the speed setting is relative to it. */
+const RECORDED_RATE = 0.85;
+
 class Narrator {
   rate = 0.85;
+  /** Prefer the recorded voice when its clips are available. */
+  useRecorded = true;
   pitch = 1.1;
   voiceURI: string | null = null;
 
@@ -52,6 +65,8 @@ class Narrator {
   current: SpeechSynthesisUtterance | null = null;
   private pendingFinish: (() => void) | null = null;
   private _enabled = true;
+  private clips: Set<string> | null = null;
+  private audio: HTMLAudioElement | null = typeof Audio !== 'undefined' ? new Audio() : null;
 
   get enabled(): boolean {
     return this._enabled;
@@ -67,6 +82,7 @@ class Narrator {
     this._enabled = value;
     if (!value && this.active) {
       const finish = this.pendingFinish;
+      this.stopAudio();
       this.synth?.cancel();
       this.clearTimers();
       if (finish) this.timers.push(window.setTimeout(finish, 300));
@@ -85,6 +101,49 @@ class Narrator {
 
   get supported(): boolean {
     return this.synth !== null;
+  }
+
+  /** Loads the recorded voice's clip list; quietly stays on the device voice if it's missing. */
+  async loadRecordedVoice(): Promise<void> {
+    try {
+      const res = await fetch(`${RECORDED_BASE}/manifest.json`, { cache: 'no-cache' });
+      if (!res.ok) return;
+      const manifest = (await res.json()) as { clips?: string[] };
+      if (!Array.isArray(manifest.clips) || manifest.clips.length === 0) return;
+      this.clips = new Set(manifest.clips);
+      this.voiceListeners.forEach((fn) => fn());
+    } catch {
+      /* no recorded voice: device voice it is */
+    }
+  }
+
+  get recordedAvailable(): boolean {
+    return this.clips !== null;
+  }
+
+  /** Warms the cache for clips that are likely to play next, so they start instantly. */
+  preload(lines: Line[]): void {
+    if (!this.canPlayRecorded(lines)) return;
+    for (const line of lines) {
+      const a = new Audio();
+      a.preload = 'auto';
+      a.src = this.clipUrl(line.id);
+    }
+  }
+
+  private canPlayRecorded(lines: Line[]): boolean {
+    return this.useRecorded && !!this.audio && !!this.clips && lines.every((l) => this.clips!.has(l.id));
+  }
+
+  private clipUrl(id: string): string {
+    return `${RECORDED_BASE}/${id}.mp3`;
+  }
+
+  private stopAudio() {
+    if (!this.audio) return;
+    this.audio.onended = null;
+    this.audio.onerror = null;
+    this.audio.pause();
   }
 
   englishVoices(): SpeechSynthesisVoice[] {
@@ -111,7 +170,10 @@ class Narrator {
     return this.active && (tag === undefined || this.currentTag === tag);
   }
 
-  speak(text: string, opts: SpeakOptions = {}): void {
+  /** Says the lines (or plain text) in one go; anything already playing is stopped. */
+  speak(input: string | Line[], opts: SpeakOptions = {}): void {
+    const lines: Line[] = typeof input === 'string' ? [{ id: '', text: input }] : input;
+    const text = lines.map((l) => l.text).join(' ');
     this.cancel();
     const token = this.token;
     this.active = true;
@@ -134,6 +196,12 @@ class Narrator {
       return;
     }
 
+    if (this.canPlayRecorded(lines)) {
+      this.playClips(lines, finish, token);
+      this.timers.push(window.setTimeout(finish, estimate * 2 + 4000));
+      return;
+    }
+
     const u = new SpeechSynthesisUtterance(text);
     const voice = this.activeVoice();
     if (voice) u.voice = voice;
@@ -149,8 +217,30 @@ class Narrator {
     this.synth.speak(u);
   }
 
+  private playClips(lines: Line[], finish: () => void, token: number) {
+    const audio = this.audio!;
+    let i = 0;
+    const next = () => {
+      if (token !== this.token) return;
+      if (i >= lines.length) {
+        finish();
+        return;
+      }
+      audio.src = this.clipUrl(lines[i++].id);
+      audio.playbackRate = this.rate / RECORDED_RATE;
+      audio.onended = next;
+      // A missing or blocked clip just moves on rather than stalling the game.
+      audio.onerror = next;
+      audio.play().catch(() => {
+        if (token === this.token) next();
+      });
+    };
+    next();
+  }
+
   cancel(): void {
     this.token++;
+    this.stopAudio();
     this.active = false;
     this.currentTag = null;
     this.current = null;

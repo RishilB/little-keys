@@ -1,4 +1,5 @@
 import { Avatar } from '../components/Avatar';
+import { FloatingFriends } from '../components/FloatingFriends';
 import { Icon } from '../components/Icon';
 import { phrases } from '../data/phrases';
 import { narrator } from '../lib/narrator';
@@ -29,6 +30,7 @@ export function Welcome({ onStart }: { onStart: () => void }) {
 
   return (
     <main className="page welcome">
+      <FloatingFriends />
       <div className="welcome-inner">
         <Avatar id={profile.avatar} size={180} className="welcome-avatar" />
         <h1 className="welcome-title">Let’s play, {profile.name}!</h1>

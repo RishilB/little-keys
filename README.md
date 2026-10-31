@@ -17,6 +17,20 @@ npm run build    # typecheck + production build in dist/
 - **Keyboard Playground** – every letter or number pops onto the canvas and is spoken. At most 9
   are visible; the oldest fade out.
 
+## Natural voice (Azure "Neerja")
+
+The app plays pre-recorded clips from `public/voice/neerja/` when they exist and falls back to the
+browser's own voice otherwise. Clips are generated once from `src/data/phrases.ts`:
+
+1. Create a free **Speech** resource in the Azure portal and copy its key and region.
+2. Copy `.env.example` to `.env.local` and fill in the key and region (this file is git-ignored).
+3. Listen to a few first: `npm run voice -- --sample`, then open the files in `public/voice/neerja/`.
+4. Record everything: `npm run voice` (about 226 short clips, well inside Azure's free tier).
+5. Commit `public/voice/neerja/` and push; Vercel deploys it.
+
+Re-run `npm run voice` after changing any wording in `phrases.ts` (`--force` re-records all).
+Recordings don't include the child's name; the on-screen text still shows it.
+
 ## Project layout
 
 | Path | What lives there |

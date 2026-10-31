@@ -7,6 +7,7 @@ import { narrator } from '../lib/narrator';
 import { sfx } from '../lib/sfx';
 
 export type Gender = 'girl' | 'boy' | 'other' | 'unspecified';
+export type ThemeId = 'sunshine' | 'blossom' | 'ocean';
 
 export interface ChildProfile {
   name: string;
@@ -14,13 +15,27 @@ export interface ChildProfile {
   ageMonths: number;
   gender: Gender;
   avatar: AvatarId;
+  /** Colour theme; suggested from gender but always the parent's choice. */
+  theme: ThemeId;
+  /** Up to MAX_FRIENDS animals/birds that float around the screens. */
+  friends: AvatarId[];
+}
+
+export function suggestedTheme(gender: Gender): ThemeId {
+  if (gender === 'girl') return 'blossom';
+  if (gender === 'boy') return 'ocean';
+  return 'sunshine';
 }
 
 export type MotionSetting = 'system' | 'reduced' | 'full';
 export type KeyboardSetting = 'auto' | 'show' | 'hide';
 
+export type VoiceSource = 'recorded' | 'device';
+
 export interface Settings {
   narration: boolean;
+  /** Natural recorded voice when available, otherwise the browser's own voice. */
+  voiceSource: VoiceSource;
   sfx: boolean;
   voiceURI: string | null;
   speechRate: number;
@@ -35,6 +50,7 @@ const SETTINGS_KEY = 'little-keys.settings.v1';
 
 export const DEFAULT_SETTINGS: Settings = {
   narration: true,
+  voiceSource: 'recorded',
   sfx: true,
   voiceURI: null,
   speechRate: 0.85,
@@ -76,7 +92,9 @@ function useMediaQuery(query: string): boolean {
 export function AppProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<ChildProfile | null>(() => {
     const stored = loadJSON<ChildProfile>(PROFILE_KEY);
-    return isProfile(stored) ? stored : null;
+    if (!isProfile(stored)) return null;
+    // Profiles saved before themes/friends existed.
+    return { ...stored, theme: stored.theme ?? suggestedTheme(stored.gender), friends: stored.friends ?? [] };
   });
   const [settings, setSettings] = useState<Settings>(() => ({
     ...DEFAULT_SETTINGS,
@@ -111,11 +129,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     narrator.enabled = settings.narration;
     narrator.voiceURI = settings.voiceURI;
     narrator.rate = settings.speechRate;
-  }, [settings.narration, settings.voiceURI, settings.speechRate]);
+    narrator.useRecorded = settings.voiceSource === 'recorded';
+  }, [settings.narration, settings.voiceURI, settings.speechRate, settings.voiceSource]);
+
+  useEffect(() => {
+    void narrator.loadRecordedVoice();
+  }, []);
 
   useEffect(() => {
     sfx.enabled = settings.sfx;
   }, [settings.sfx]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = profile?.theme ?? 'sunshine';
+  }, [profile?.theme]);
 
   useEffect(() => {
     document.documentElement.dataset.motion = reducedMotion ? 'reduced' : 'full';

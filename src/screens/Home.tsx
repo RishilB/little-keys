@@ -1,4 +1,5 @@
 import { Avatar } from '../components/Avatar';
+import { FloatingFriends } from '../components/FloatingFriends';
 import { ParentBar } from '../components/ParentBar';
 import { colorForChar } from '../data/characters';
 import { useApp } from '../state/AppContext';
@@ -23,6 +24,7 @@ export function Home({ onFindTheKey, onPlayground, onOpenSettings }: Props) {
   return (
     <div className="screen">
       <ParentBar onOpenSettings={onOpenSettings} />
+      <FloatingFriends />
       <main className="page home">
         {profile && (
           <div className="home-greeting">

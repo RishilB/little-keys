@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { phrases } from '../data/phrases';
 import { useFullscreen } from '../hooks/useFullscreen';
-import { narrator } from '../lib/narrator';
+import { RECORDED_VOICE, narrator } from '../lib/narrator';
 import { sfx } from '../lib/sfx';
-import { useApp, type KeyboardSetting, type MotionSetting } from '../state/AppContext';
+import { useApp, type KeyboardSetting, type MotionSetting, type VoiceSource } from '../state/AppContext';
 import { Avatar } from './Avatar';
 import { Icon } from './Icon';
 
@@ -86,6 +86,8 @@ export function SettingsPanel({ onClose, onEditProfile }: Props) {
   };
 
   const active = narrator.activeVoice();
+  const recorded = narrator.recordedAvailable;
+  const usingDevice = !recorded || settings.voiceSource === 'device';
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -101,10 +103,24 @@ export function SettingsPanel({ onClose, onEditProfile }: Props) {
           <h3>Sound</h3>
           <Toggle label="Voice narration" hint="Instructions, letter names and praise" checked={settings.narration} onChange={(v) => updateSettings({ narration: v })} />
           <Toggle label="Sound effects" hint="Soft chimes and pops" checked={settings.sfx} onChange={(v) => updateSettings({ sfx: v })} />
+          {recorded && (
+            <Segmented<VoiceSource>
+              label="Voice"
+              value={settings.voiceSource}
+              options={[
+                { value: 'recorded', label: RECORDED_VOICE.label },
+                { value: 'device', label: 'Device voice' },
+              ]}
+              onChange={(v) => updateSettings({ voiceSource: v })}
+            />
+          )}
           <div className="setting-row stacked">
             <label className="setting-label" htmlFor="voice-select">
-              Voice
+              {recorded ? 'Device voice' : 'Voice'}
             </label>
+            {!recorded || usingDevice ? null : (
+              <p className="setting-hint">Used only if a recording is missing.</p>
+            )}
             {narrator.supported ? (
               <div className="voice-row">
                 <select

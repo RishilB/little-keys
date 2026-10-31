@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Avatar } from '../components/Avatar';
-import { AVATARS, type AvatarId } from '../data/avatars';
-import { useApp, type ChildProfile, type Gender } from '../state/AppContext';
+import { AVATARS, MAX_FRIENDS, type AvatarId } from '../data/avatars';
+import { suggestedTheme, useApp, type ChildProfile, type Gender, type ThemeId } from '../state/AppContext';
 
 interface Props {
   mode: 'create' | 'edit';
@@ -16,6 +16,12 @@ const GENDERS: { value: Gender; label: string }[] = [
   { value: 'unspecified', label: 'Prefer not to say' },
 ];
 
+const THEMES: { value: ThemeId; label: string; swatch: string[] }[] = [
+  { value: 'blossom', label: 'Blossom', swatch: ['#D6457A', '#FCE1EB', '#EDE3FB'] },
+  { value: 'ocean', label: 'Ocean', swatch: ['#2D7FC1', '#DDEEFA', '#D5F0E8'] },
+  { value: 'sunshine', label: 'Sunshine', swatch: ['#4F6EF0', '#FFE4D1', '#D8F3EA'] },
+];
+
 export function ProfileForm({ mode, onDone, onCancel }: Props) {
   const { profile, saveProfile } = useApp();
   const initial: ChildProfile = (mode === 'edit' && profile) || {
@@ -24,9 +30,13 @@ export function ProfileForm({ mode, onDone, onCancel }: Props) {
     ageMonths: 0,
     gender: 'unspecified',
     avatar: 'bear',
+    theme: 'sunshine',
+    friends: [],
   };
   const [draft, setDraft] = useState<ChildProfile>(initial);
   const [error, setError] = useState('');
+  // The theme follows the gender choice until the parent picks one themselves.
+  const [themeTouched, setThemeTouched] = useState(mode === 'edit');
 
   const set = <K extends keyof ChildProfile>(key: K, value: ChildProfile[K]) => setDraft((d) => ({ ...d, [key]: value }));
 
@@ -114,7 +124,15 @@ export function ProfileForm({ mode, onDone, onCancel }: Props) {
           <div className="chip-row">
             {GENDERS.map((g) => (
               <label key={g.value} className={draft.gender === g.value ? 'chip active' : 'chip'}>
-                <input type="radio" name="gender" value={g.value} checked={draft.gender === g.value} onChange={() => set('gender', g.value)} />
+                <input
+                  type="radio"
+                  name="gender"
+                  value={g.value}
+                  checked={draft.gender === g.value}
+                  onChange={() =>
+                    setDraft((d) => ({ ...d, gender: g.value, theme: themeTouched ? d.theme : suggestedTheme(g.value) }))
+                  }
+                />
                 {g.label}
               </label>
             ))}
@@ -122,7 +140,33 @@ export function ProfileForm({ mode, onDone, onCancel }: Props) {
         </fieldset>
 
         <fieldset className="field">
-          <legend>Choose a friend</legend>
+          <legend>Colour theme</legend>
+          <div className="chip-row">
+            {THEMES.map((t) => (
+              <label key={t.value} className={draft.theme === t.value ? 'chip theme-chip active' : 'chip theme-chip'}>
+                <input
+                  type="radio"
+                  name="theme"
+                  value={t.value}
+                  checked={draft.theme === t.value}
+                  onChange={() => {
+                    setThemeTouched(true);
+                    set('theme', t.value);
+                  }}
+                />
+                <span className="swatch" aria-hidden="true">
+                  {t.swatch.map((c) => (
+                    <span key={c} style={{ background: c }} />
+                  ))}
+                </span>
+                {t.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset className="field">
+          <legend>Choose an avatar</legend>
           <div className="avatar-grid">
             {AVATARS.map((a) => (
               <label key={a.id} className={draft.avatar === a.id ? 'avatar-option active' : 'avatar-option'}>
@@ -131,6 +175,44 @@ export function ProfileForm({ mode, onDone, onCancel }: Props) {
                 <span>{a.label}</span>
               </label>
             ))}
+          </div>
+        </fieldset>
+
+        <fieldset className="field">
+          <legend>
+            Animal &amp; bird friends <span className="optional">(pick up to {MAX_FRIENDS})</span>
+          </legend>
+          <p className="setting-hint friends-count" aria-live="polite">
+            {draft.friends.length} of {MAX_FRIENDS} chosen · they float around and cheer
+          </p>
+          <div className="avatar-grid friends-grid">
+            {AVATARS.map((a) => {
+              const checked = draft.friends.includes(a.id);
+              const full = !checked && draft.friends.length >= MAX_FRIENDS;
+              return (
+                <label
+                  key={a.id}
+                  className={`avatar-option${checked ? ' active' : ''}${full ? ' disabled' : ''}`}
+                >
+                  <input
+                    type="checkbox"
+                    value={a.id}
+                    checked={checked}
+                    disabled={full}
+                    onChange={() =>
+                      set('friends', checked ? draft.friends.filter((f) => f !== a.id) : [...draft.friends, a.id])
+                    }
+                  />
+                  <Avatar id={a.id} size={56} />
+                  <span>{a.label}</span>
+                  {checked && (
+                    <span className="pick-badge" aria-hidden="true">
+                      ✓
+                    </span>
+                  )}
+                </label>
+              );
+            })}
           </div>
         </fieldset>
 
