@@ -838,18 +838,41 @@ input[aria-invalid='true'] {
 
 .placed {
   position: absolute;
-  transform: translate(-50%, -50%) rotate(var(--rot));
+  z-index: 1;
+  /* At rest: in its side spot, scaled down from the big spotlight size. */
+  transform: translate(-50%, -50%) rotate(var(--rot)) scale(var(--rest));
   font-weight: 700;
   line-height: 1;
   user-select: none;
-  text-shadow: 0 6px 0 rgba(47, 53, 80, 0.06);
-  animation: placed-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-  transition: opacity 0.7s ease, transform 0.7s ease;
+  text-shadow: 0 10px 0 rgba(47, 53, 80, 0.06);
+  transition: opacity 0.7s ease, transform 0.75s cubic-bezier(0.45, 0, 0.2, 1);
+}
+
+/* The newest key: big in the center of the canvas. */
+.placed.spotlight {
+  z-index: 2;
+  transform: translate(-50%, -50%) translate(var(--dx), var(--dy));
+  text-shadow: 0 0 40px rgba(255, 255, 255, 0.9), 0 14px 0 rgba(47, 53, 80, 0.07);
+  animation: spot-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .placed.leaving {
   opacity: 0;
-  transform: translate(-50%, -50%) rotate(var(--rot)) scale(0.85);
+  transform: translate(-50%, -50%) rotate(var(--rot)) scale(calc(var(--rest) * 0.8));
+}
+
+/* Soft glow in the key's colour behind the spotlight. */
+.spot-halo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(62%, 78vh);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  opacity: 0.14;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: halo-in 0.6s ease-out;
 }
 
 /* ---------- On-screen keyboard ---------- */
@@ -1243,14 +1266,25 @@ input[aria-invalid='true'] {
   }
 }
 
-@keyframes placed-in {
+@keyframes spot-in {
   from {
-    transform: translate(-50%, -50%) rotate(var(--rot)) scale(0.3);
+    transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) scale(0.3);
     opacity: 0;
   }
   to {
-    transform: translate(-50%, -50%) rotate(var(--rot)) scale(1);
+    transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) scale(1);
     opacity: 1;
+  }
+}
+
+@keyframes halo-in {
+  from {
+    transform: translate(-50%, -50%) scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.14;
   }
 }
 
@@ -1356,9 +1390,8 @@ html[data-motion='reduced'] *::after {
   scroll-behavior: auto !important;
 }
 
-html[data-motion='reduced'] .placed,
-html[data-motion='reduced'] .placed.leaving {
-  transform: translate(-50%, -50%) rotate(var(--rot));
+/* Calm: keys still show big in the center, then appear in their spot without gliding. */
+html[data-motion='reduced'] .placed {
   transition: opacity 0.4s linear;
 }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { keyEventToChar } from '../lib/keys';
 import { firstIndex, nextIndex, nextRandomIndex } from '../lib/sequence';
-import { addChar, MAX_VISIBLE, type PlacedChar } from '../lib/playground';
+import { addChar, layoutFor, MAX_VISIBLE, type PlacedChar } from '../lib/playground';
 
 const key = (key: string, code = '', mods: Partial<KeyboardEvent> = {}) =>
   keyEventToChar({ key, code, ctrlKey: false, metaKey: false, altKey: false, ...mods } as KeyboardEvent);
@@ -56,29 +56,44 @@ describe('sequences', () => {
 });
 
 describe('playground placement', () => {
-  const grid = { cols: 5, rows: 3 };
-  it('never overlaps cells and keeps the visible count bounded during long play', () => {
-    let items: PlacedChar[] = [];
-    for (let i = 0; i < 500; i++) {
-      items = addChar(items, 'ABCDEFGHIJ0123456789'[i % 20], grid);
-      const cells = items.map((it) => it.cell);
-      expect(new Set(cells).size).toBe(cells.length);
-      expect(items.filter((it) => !it.leaving).length).toBeLessThanOrEqual(MAX_VISIBLE);
-      expect(items.length).toBeLessThanOrEqual(grid.cols * grid.rows);
-      // Simulate the fade-out finishing every few presses.
-      if (i % 4 === 0) items = items.filter((it) => !it.leaving);
-    }
-  });
-  it('keeps characters inside the canvas', () => {
-    let items: PlacedChar[] = [];
-    for (let i = 0; i < 50; i++) items = addChar(items, 'Q', grid);
-    for (const it of items) {
-      expect(it.x).toBeGreaterThan(0);
-      expect(it.x).toBeLessThan(100);
-      expect(it.y).toBeGreaterThan(0);
-      expect(it.y).toBeLessThan(100);
-    }
-  });
+  const screens = [
+    { name: 'laptop', w: 1000, h: 640 },
+    { name: 'wide', w: 1600, h: 600 },
+    { name: 'phone', w: 360, h: 640 },
+  ];
+
+  for (const { name, w, h } of screens) {
+    const layout = layoutFor(w, h);
+
+    it(`${name}: never overlaps and keeps the visible count bounded during long play`, () => {
+      let items: PlacedChar[] = [];
+      for (let i = 0; i < 500; i++) {
+        items = addChar(items, 'ABCDEFGHIJ0123456789'[i % 20], layout);
+        const cells = items.map((it) => it.cell);
+        expect(new Set(cells).size).toBe(cells.length);
+        expect(items.filter((it) => !it.leaving).length).toBeLessThanOrEqual(MAX_VISIBLE);
+        expect(items.length).toBeLessThanOrEqual(layout.cells.length);
+        // Simulate the fade-out finishing every few presses.
+        if (i % 4 === 0) items = items.filter((it) => !it.leaving);
+      }
+    });
+
+    it(`${name}: resting keys stay inside the canvas and out of the center spotlight`, () => {
+      expect(layout.cells.length).toBeGreaterThanOrEqual(8);
+      let items: PlacedChar[] = [];
+      for (let i = 0; i < 60; i++) items = addChar(items, 'W', layout);
+      for (const it of items) {
+        expect(it.x).toBeGreaterThan(0);
+        expect(it.x).toBeLessThan(100);
+        expect(it.y).toBeGreaterThan(0);
+        expect(it.y).toBeLessThan(100);
+        if (layout.orientation === 'sides') expect(Math.abs(it.x - 50)).toBeGreaterThan(23);
+        else expect(Math.abs(it.y - 50)).toBeGreaterThan(23);
+      }
+      // The spotlight character is much bigger than a resting one.
+      expect(layout.spotPx).toBeGreaterThan(layout.cellPx * 2);
+    });
+  }
 });
 
 describe('narration lines', () => {

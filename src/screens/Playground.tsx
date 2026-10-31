@@ -6,11 +6,13 @@ import { KEYBOARD_ROWS, itemForChar } from '../data/characters';
 import { phrases } from '../data/phrases';
 import { useCharInput } from '../hooks/useCharInput';
 import { narrator } from '../lib/narrator';
-import { addChar, gridFor, type PlacedChar } from '../lib/playground';
+import { addChar, layoutFor, type PlacedChar } from '../lib/playground';
 import { sfx } from '../lib/sfx';
 import { useApp } from '../state/AppContext';
 
 const FADE_MS = 700;
+/** How long a new key stays big in the center before gliding to the side. */
+const SPOTLIGHT_MS = 1100;
 const ROWS = [KEYBOARD_ROWS.numbers[0], ...KEYBOARD_ROWS.letters];
 
 interface Props {
@@ -26,8 +28,10 @@ export function Playground({ inputEnabled, onHome, onOpenSettings }: Props) {
   const [items, setItems] = useState<PlacedChar[]>([]);
   const itemsRef = useRef<PlacedChar[]>([]);
   const timers = useRef<number[]>([]);
+  const [spotlightId, setSpotlightId] = useState<number | null>(null);
+  const spotlightTimer = useRef<number | undefined>(undefined);
 
-  const grid = gridFor(size.w, size.h);
+  const layout = layoutFor(size.w, size.h);
 
   const commit = (next: PlacedChar[]) => {
     itemsRef.current = next;
@@ -56,6 +60,7 @@ export function Playground({ inputEnabled, onHome, onOpenSettings }: Props) {
     return () => {
       narrator.cancel();
       timers.current.forEach((t) => window.clearTimeout(t));
+      window.clearTimeout(spotlightTimer.current);
     };
   }, []);
 
@@ -66,9 +71,13 @@ export function Playground({ inputEnabled, onHome, onOpenSettings }: Props) {
     // Each press interrupts the previous name, so speech never queues up.
     narrator.speak(phrases.playgroundKey(item), { tag: 'playground' });
     const wasLeaving = new Set(itemsRef.current.filter((it) => it.leaving).map((it) => it.id));
-    const next = addChar(itemsRef.current, item.char, grid);
+    const next = addChar(itemsRef.current, item.char, layout);
     commit(next);
     removeLater(next.filter((it) => it.leaving && !wasLeaving.has(it.id)).map((it) => it.id));
+    // The newest key takes the spotlight; any previous one glides to its spot right away.
+    setSpotlightId(next[next.length - 1].id);
+    window.clearTimeout(spotlightTimer.current);
+    spotlightTimer.current = window.setTimeout(() => setSpotlightId(null), SPOTLIGHT_MS);
   };
 
   useCharInput(handleChar, inputEnabled);
@@ -76,12 +85,15 @@ export function Playground({ inputEnabled, onHome, onOpenSettings }: Props) {
   const clear = (e: MouseEvent<HTMLButtonElement>) => {
     e.currentTarget.blur();
     const current = itemsRef.current;
+    setSpotlightId(null);
     commit(current.map((it) => ({ ...it, leaving: true })));
     removeLater(current.map((it) => it.id));
   };
 
-  const cell = Math.min(size.w / grid.cols, size.h / grid.rows);
-  const fontSize = Math.max(48, cell * 0.72);
+  // Characters are drawn at spotlight size (crisp when big) and scaled down at rest.
+  const spotPx = Math.max(96, layout.spotPx);
+  const restScale = Math.max(40, layout.cellPx * 0.72) / spotPx;
+  const spotlight = items.find((it) => it.id === spotlightId && !it.leaving);
   const isEmpty = items.every((it) => it.leaving);
   const showKeyboard = settings.onScreenKeyboard === 'show' || (settings.onScreenKeyboard === 'auto' && coarsePointer);
 
@@ -100,17 +112,24 @@ export function Playground({ inputEnabled, onHome, onOpenSettings }: Props) {
               Press a letter or number
             </p>
           )}
+          {spotlight && (
+            <span key={`halo-${spotlight.id}`} className="spot-halo" style={{ background: spotlight.color }} aria-hidden="true" />
+          )}
           {items.map((it) => (
             <span
               key={it.id}
-              className={it.leaving ? 'placed leaving' : 'placed'}
+              className={`placed${it.leaving ? ' leaving' : ''}${it === spotlight ? ' spotlight' : ''}`}
               style={
                 {
                   left: `${it.x}%`,
                   top: `${it.y}%`,
                   color: it.color,
-                  fontSize,
+                  fontSize: spotPx,
                   '--rot': `${it.rotate}deg`,
+                  '--rest': restScale,
+                  // Offset from the resting spot to the canvas center.
+                  '--dx': `${((50 - it.x) / 100) * size.w}px`,
+                  '--dy': `${((50 - it.y) / 100) * size.h}px`,
                 } as CSSProperties
               }
             >
